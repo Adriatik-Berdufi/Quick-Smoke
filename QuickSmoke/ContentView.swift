@@ -1,61 +1,73 @@
-//
-//  ContentView.swift
-//  QuickSmoke
-//
-//  Created by Adriatik Berdufi on 09/05/2026.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @StateObject private var viewModel = ChallengeViewModel()
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        MainTabView(
+            viewModel: viewModel,
+            initialSelection: viewModel.needsOnboarding ? 2 : 0
+        )
+        .onAppear {
+            viewModel.requestNotificationPermission()
+        }
+    }
+}
+
+private struct MainTabView: View {
+    @ObservedObject var viewModel: ChallengeViewModel
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var selection: Int
+
+    init(viewModel: ChallengeViewModel, initialSelection: Int) {
+        self.viewModel = viewModel
+        _selection = State(initialValue: initialSelection)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $selection) {
+                DashboardView(viewModel: viewModel)
+                    .tag(0)
+
+                HistoryView(viewModel: viewModel)
+                    .tag(1)
+
+                SettingsView(viewModel: viewModel)
+                    .tag(2)
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            if verticalSizeClass != .compact {
+                HStack {
+                    tabButton(title: "Dashboard", systemImage: "timer", tag: 0)
+                    tabButton(title: "Progressi", systemImage: "chart.line.uptrend.xyaxis", tag: 1)
+                    tabButton(title: "Impostazioni", systemImage: "gearshape", tag: 2)
                 }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+                .background(.ultraThinMaterial)
             }
-        } detail: {
-            Text("Select an item")
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    private func tabButton(title: String, systemImage: String, tag: Int) -> some View {
+        Button {
+            selection = tag
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .font(.caption2)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .foregroundStyle(selection == tag ? Color.accentColor : .secondary)
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
